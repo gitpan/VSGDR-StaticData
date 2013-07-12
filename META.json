@@ -1,0 +1,53 @@
+{
+   "abstract" : "Static data script support package for SSDT post-deployment steps, Ded MedVed..\r",
+   "author" : [
+      "Ded MedVed <dedmedved@cpan>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.120921",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "VSGDR-StaticData",
+   "no_index" : {
+      "directory" : [
+         "t",
+         "inc"
+      ]
+   },
+   "prereqs" : {
+      "build" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "configure" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Carp" : "0",
+            "DBD::ODBC" : "0",
+            "DBI" : "0",
+            "Data::Dumper" : "0",
+            "Getopt::Euclid" : "0",
+            "Graph" : "0",
+            "Modern::Perl" : "0",
+            "POSIX" : "0",
+            "Test::More" : "0",
+            "autodie" : "0",
+            "indirect" : "0",
+            "perl" : "0",
+            "version" : "0"
+         }
+      }
+   },
+   "release_status" : "stable",
+   "version" : "0.01"
+}
