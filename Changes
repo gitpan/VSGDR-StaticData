@@ -2,3 +2,5 @@ Revision history for VSGDR::StaticData
 
 0.01    12/07/2013
         First version, released on an unsuspecting world.  Broken.
+0.02    16/07/2013
+        POD changes.

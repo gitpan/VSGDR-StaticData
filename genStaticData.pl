@@ -15,7 +15,7 @@ use Getopt::Euclid qw( :vars<opt_> );
 use Data::Dumper;
 use VSGDR::StaticData;
 
-use version ; our $VERSION = qv('0.01');
+use version ; our $VERSION = qv('0.02');
 
 my $schema          = ($opt_tablename =~ m{ \A ([^.]+) \. ([^.]+) \z }xms) ? $1 : "dbo" ;
 my $table           = ($opt_tablename =~ m{ \A ([^.]+) \. ([^.]+) \z }xms) ? $2 : $opt_tablename;
@@ -42,11 +42,11 @@ __DATA__
 =head1 NAME
 
 
-genStaticData.pl - Creates a Callcredit static data script for a database table
+genStaticData.pl - Creates a static data script for a database table
 
 =head1 VERSION
 
-0.01
+0.02
 
 
 =head1 USAGE
