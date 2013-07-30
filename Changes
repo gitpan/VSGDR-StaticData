@@ -4,3 +4,5 @@ Revision history for VSGDR::StaticData
         First version, released on an unsuspecting world.  Broken.
 0.02    16/07/2013
         POD changes.
+0.03    30/07/2013
+        Minor changes to output. Removed Dumper statement.

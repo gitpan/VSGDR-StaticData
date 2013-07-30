@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.02
+Version 0.03
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 
 1;
@@ -106,7 +106,7 @@ sub generateScript {
     croak "bad arg table"   unless defined $table;
 
     my $combinedName    = "${schema}.${table}"; 
-warn Dumper $dbh;    
+
     my $database        = databaseName($dbh);
 
     no warnings;
@@ -345,7 +345,7 @@ begin catch
             else rollback
     end
 
-    print 'Deployment of ${table} static data for NSI developer deployment failed .'
+    print 'Deployment of ${table} static data for developer deployment failed .'
     print error_message()
     
     ${set_IDENTITY_INSERT_OFF}
