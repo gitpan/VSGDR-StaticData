@@ -18,12 +18,13 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
+# TODO - lookslike a number doesn't cut it for mixed content columns ie strings that are numbers too.
 
 1;
 
@@ -126,15 +127,39 @@ sub generateScript {
     my $ra_columns              = columns($dbh,$schema,$table);
     my $ra_pkcolumns            = pkcolumns($dbh,$schema,$table);
 
-    croak 'No Primary Key defined'          unless scalar @{$ra_pkcolumns};
-    croak 'Unusable Primary Key defined'    unless scalar @{$ra_pkcolumns} == 1;
+#    croak 'No Primary Key defined'          unless scalar @{$ra_pkcolumns};
+#    croak 'Unusable Primary Key defined'    unless scalar @{$ra_pkcolumns} == 1;
 
-    my $pk_column = $ra_pkcolumns->[0][0];    
-    my @nonKeyColumns = grep { $_->[0] ne $pk_column } @{$ra_columns};
+    my $primaryKeyCheckClause   = "";
+    my $pk_column               = undef ; #$ra_pkcolumns->[0][0];    
+    #my @nonKeyColumns = grep { $_->[0][0] ne $pk_column } @{$ra_columns};
 
+    my @nonKeyColumns           = () ;
+
+    
+    if ( ! scalar @{$ra_pkcolumns} ) {
+        my @pk_ColumnsCheck     = map { "( $_->[0]\t\t\t = \@$_->[0] or ( $_->[0]\t\t\t is null and \@$_->[0] is null ) ) " } @{$ra_columns} ;
+        $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\tand\t"; "@pk_ColumnsCheck" }  
+    }
+    elsif ( scalar @{$ra_pkcolumns} != 1 ) {
+        my @pk_ColumnsCheck     = map { "$_->[0]\t\t\t = \@$_->[0]" } @{$ra_columns} ;
+        $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\tand\t"; "@pk_ColumnsCheck" }  ;
+
+        foreach my $col (@{$ra_columns}) {
+#warn Dumper @{$ra_columns};
+#warn Dumper $col;
+            push @nonKeyColumns, $col unless grep {$_->[0] eq $col->[0] } @{$ra_pkcolumns} ;
+        }
+    }
+    else {
+        $pk_column              = $ra_pkcolumns->[0][0];        
+        $primaryKeyCheckClause  = "where   ${pk_column}        = \@${pk_column}";
+        @nonKeyColumns = grep { $_->[0] ne $pk_column } @{$ra_columns};        
+    } 
+    
 
     my $variabledeclaration     = "declare\t" ;
-    my $tabledeclaration        = "\t(\tId\t\tint\tnot null\n\t\t,\t" ;
+    my $tabledeclaration        = "\t(\tStaticDataPopulationId\t\tint\tnot null\n\t\t,\t" ;
     my $selectstatement         = "select\t" ;
     my $insertclause            = "insert into ${combinedName}\n\t\t\t\t(";
     my $valuesclause            = "values(";
@@ -183,7 +208,6 @@ sub generateScript {
 
     my $insertingPrintStatement = "'Inserting ${combinedName}:' + " . $printStatement ;
     my $updatingPrintStatement  = "'Updating ${combinedName}: ' + " . $printStatement;
-    my $noopPrintStatement      = "'Nothing to update. ${combinedName}: Values are unchanged for Primary Key: '";
 
 
     my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column);
@@ -200,6 +224,52 @@ sub generateScript {
         $lno++;
     }
     $valuesClause        =~ s{ \n\t\t,\t \z }{}msx;
+    
+
+    my $noopPrintStatement      = "'Nothing to update. Values are unchanged.'";
+    my $printNoOpStatement      = "print ${noopPrintStatement}" ;
+    if ( ${pk_column} ) {
+        $noopPrintStatement     = "'Nothing to update. ${combinedName}: Values are unchanged for Primary Key: '";    
+        $printNoOpStatement     = "print ${noopPrintStatement} + cast(\@${pk_column} as varchar(10)) "
+    }
+
+
+
+    my ${elseBlock} = "";
+    
+    if ( scalar @nonKeyColumns ) {    
+        ${elseBlock} = 
+"        -- if the static data doesn't match what is already there then update it.
+        -- 'except' handily handles null as equal.  Saves some extensive twisted logic.
+        else begin
+            if exists 
+                (
+                select  ${flatcolumnlist}
+                from    $combinedName
+                ${primaryKeyCheckClause}
+                except
+                select  ${flatvariablelist}
+                ) begin
+                print $updatingPrintStatement
+                if \@DeploySwitch = 1 begin
+                    update  s
+                    ${updateColumns}
+                    from    $combinedName s
+                    ${primaryKeyCheckClause}
+                end
+            end
+            else  begin
+                ${printNoOpStatement}
+            end 
+        end
+";
+    } 
+    
+    my $tmp_sv = substr(${table},0,20) ;
+    my $savePointName = "sc_${tmp_sv}_SP";    
+
+#warn Dumper @nonKeyColumns ;
+
 
 return <<"EOF";
 
@@ -247,9 +317,9 @@ begin try
 
 
     begin transaction
-    save transaction sc_Config_${table}_SavePoint;
+    save transaction ${savePointName} ;
 
-    set \@localTransactionStarted = 1;
+    set \@localTransactionStarted       = 1;
 
     declare \@${table} table
     ${tabledeclaration}
@@ -259,13 +329,13 @@ begin try
     select * 
     from(  ${valuesClause}
         ) AS vtable 
-    ( Id, $flatcolumnlist)
+    ( StaticDataPopulationId, $flatcolumnlist)
     )
     insert  into
             \@${table} 
-    (       Id,             ${flatcolumnlist}
+    (       StaticDataPopulationId,             ${flatcolumnlist}
     )
-    select  Id,   ${flatcolumnlist}
+    select  StaticDataPopulationId,   ${flatcolumnlist}
     from    src
 
     ${variabledeclaration}        
@@ -282,13 +352,13 @@ begin try
 
         ${selectstatement}
         from    \@${table}
-        where   Id = \@i
+        where   StaticDataPopulationId = \@i
 
         if not exists
                 (
                 select  * 
                 from    $combinedName
-                where   ${pk_column}        = \@${pk_column}
+                ${primaryKeyCheckClause}
                 )  begin
             print $insertingPrintStatement
             if \@DeploySwitch = 1 begin
@@ -298,29 +368,7 @@ begin try
                 ${set_IDENTITY_INSERT_OFF}
             end
         end
-        -- if the static data doesn't match what is already there then update it.
-        -- 'except' handily handles null as equal.  Saves some extensive twisted logic.
-        else begin
-            if exists 
-                (
-                select  ${flatcolumnlist}
-                from    $combinedName
-                where   ${pk_column}    = \@${pk_column}
-                except
-                select  ${flatvariablelist}
-                ) begin
-                print $updatingPrintStatement
-                if \@DeploySwitch = 1 begin
-                    update  s
-                    ${updateColumns}
-                    from    $combinedName s
-                    where   ${pk_column}        = \@${pk_column}
-                end
-            end
-            else  begin
-                print $noopPrintStatement + cast(\@${pk_column} as varchar(10)) 
-            end 
-        end
+        ${elseBlock}
 
         set \@i=\@i+1
     end
@@ -338,7 +386,7 @@ begin catch
     if \@\@trancount > 0 begin
         if \@\@trancount > 1 begin
             if \@localTransactionStarted is not null and \@localTransactionStarted = 1 
-                rollback transaction sc_Config_${table}_SavePoint;
+                rollback transaction ${savePointName};
                 commit ; --  windback our local transaction completely
             --else it's probably nothing to do with us.
         end
@@ -367,7 +415,7 @@ sub getCurrentTableData {
     
     my $dbh          = shift or croak 'no dbh' ;
     my $combinedName = shift or croak 'no table' ;
-    my $pkCol        = shift or croak 'no primary key' ;
+    my $pkCol        = shift ; #or croak 'no primary key' ;
 
     my $sth2 = $dbh->prepare(getCurrentTableDataSQL($combinedName,$pkCol));
     my $rs   = $sth2->execute();
@@ -382,14 +430,23 @@ sub getCurrentTableDataSQL {
     local $_ = undef ;
     
     my $combinedName = shift or croak 'no table' ;
-    my $pkCol        = shift or croak 'no primary key' ;
+    my $pkCol        = shift ; #or croak 'no primary key' ;
+    
+    my $orderBy      = "" ; 
+    
+    if ( ! $pkCol ) {
+        $orderBy = "" ;     
+    }
+    else {
+        $orderBy = "order   by        $pkCol" ; 
+    }
 
 return <<"EOF" ;
 
 select  *
 from    $combinedName so
-order   by
-        $pkCol
+${orderBy}
+
 EOF
 
 }

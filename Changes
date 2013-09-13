@@ -6,3 +6,6 @@ Revision history for VSGDR::StaticData
         POD changes.
 0.03    30/07/2013
         Minor changes to output. Removed Dumper statement.
+0.04    13/09/2013
+        Allowed for multiple column PKeys and no PKey.
+        
