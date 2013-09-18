@@ -18,15 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.04
+Version 0.05
 
 =cut
 
-our $VERSION = '0.04';
-
-# TODO - lookslike a number doesn't cut it for mixed content columns ie strings that are numbers too.
-
-1;
+our $VERSION = '0.05';
 
 
 sub databaseName {
@@ -127,8 +123,16 @@ sub generateScript {
     my $ra_columns              = columns($dbh,$schema,$table);
     my $ra_pkcolumns            = pkcolumns($dbh,$schema,$table);
 
+#warn Dumper $ra_columns ;
+#exit ;
+
 #    croak 'No Primary Key defined'          unless scalar @{$ra_pkcolumns};
 #    croak 'Unusable Primary Key defined'    unless scalar @{$ra_pkcolumns} == 1;
+
+    my @ColumnNumericity = map { $_->[1] =~ m{char|text|date}i ? 0 : 1 ;  } @{$ra_columns} ;
+
+#warn Dumper @ColumnNumericity ;
+#exit;
 
     my $primaryKeyCheckClause   = "";
     my $pk_column               = undef ; #$ra_pkcolumns->[0][0];    
@@ -218,7 +222,13 @@ sub generateScript {
     my $lno             = 1;
     foreach my $ra_row (@{$ra_data}){
     #    warn Dumper $ra_row;
-        my @outVals = map { looks_like_number($_) ? $_ : $dbh->quote($_)  } @{$ra_row};
+        my @outVals = () ;
+#warn Dumper @{$ra_row} ;        
+        for ( my $i = 0; $i < scalar @{$ra_row}; $i++ ) {
+#warn Dumper $ra_row->[$i] ;        
+            $outVals[$i] = ( $ColumnNumericity[$i] == 1 ) ? $ra_row->[$i] : $dbh->quote($ra_row->[$i]) ;
+        }
+        #my @outVals = map { $ColumnNumericity{$_} == 1 ? $_ : $dbh->quote($_)  } @{$ra_row};
         my $line = do{ local $" = ", "; "@outVals" } ;
         $valuesClause    .= "(\t" . "$lno, " . $line . ")" . "\n\t\t,\t" ;
         $lno++;
@@ -232,14 +242,27 @@ sub generateScript {
         $noopPrintStatement     = "'Nothing to update. ${combinedName}: Values are unchanged for Primary Key: '";    
         $printNoOpStatement     = "print ${noopPrintStatement} + cast(\@${pk_column} as varchar(10)) "
     }
+    
+    my $elsePrintSection        = <<"EOF";
+else  begin
+                ${printNoOpStatement}
+            end 
+EOF
 
-
+    if ( scalar @{$ra_data} > 30  ){
+        $elsePrintSection        = <<"EOF";
+else  begin
+                set \@UnchangedCount += 1 ;
+            end 
+EOF
+    }
 
     my ${elseBlock} = "";
     
     if ( scalar @nonKeyColumns ) {    
-        ${elseBlock} = 
-"        -- if the static data doesn't match what is already there then update it.
+        ${elseBlock} = <<"EOF";
+        
+        -- if the static data doesn''t match what is already there then update it.
         -- 'except' handily handles null as equal.  Saves some extensive twisted logic.
         else begin
             if exists 
@@ -258,17 +281,21 @@ sub generateScript {
                     ${primaryKeyCheckClause}
                 end
             end
-            else  begin
-                ${printNoOpStatement}
-            end 
+            ${elsePrintSection}
         end
-";
+EOF
     } 
+    
     
     my $tmp_sv = substr(${table},0,20) ;
     my $savePointName = "sc_${tmp_sv}_SP";    
 
+    my ${printUnchangedTotalsSection} = "" ;
 #warn Dumper @nonKeyColumns ;
+
+    if ( scalar @{$ra_data} > 30  ){
+        $printUnchangedTotalsSection        = "print 'Total count of unaltered records : ' + cast( \@UnchangedCount as varchar(10))" ;
+    }
 
 
 return <<"EOF";
@@ -311,7 +338,8 @@ begin try
 
     -- Declarations
     declare \@ct                         int          
-    ,       \@i                          int          
+    ,       \@i                          int  
+    ,       \@UnchangedCount             int = 0
 
     declare \@localTransactionStarted bit;
 
@@ -376,6 +404,7 @@ begin try
     commit
 
 
+    ${printUnchangedTotalsSection}
 
 end try
 begin catch

@@ -8,4 +8,8 @@ Revision history for VSGDR::StaticData
         Minor changes to output. Removed Dumper statement.
 0.04    13/09/2013
         Allowed for multiple column PKeys and no PKey.
+0.05    18/09/2013
+        Fixed quoting bug resulting from use of like a number on a line by line basis.
+        Added cut-off limit on update reporting of a 100+.
+        Added total non-updated count on update reporting of a 100+.
         
