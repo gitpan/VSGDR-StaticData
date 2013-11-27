@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.05
+Version 0.06
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 
 sub databaseName {
@@ -103,6 +103,7 @@ sub generateScript {
     croak "bad arg table"   unless defined $table;
 
     my $combinedName    = "${schema}.${table}"; 
+    my $tableVarName    = "LocalTable_${table}"; 
 
     my $database        = databaseName($dbh);
 
@@ -349,7 +350,7 @@ begin try
 
     set \@localTransactionStarted       = 1;
 
-    declare \@${table} table
+    declare \@${tableVarName} table
     ${tabledeclaration}
     
     ; with src as 
@@ -360,7 +361,7 @@ begin try
     ( StaticDataPopulationId, $flatcolumnlist)
     )
     insert  into
-            \@${table} 
+            \@${tableVarName} 
     (       StaticDataPopulationId,             ${flatcolumnlist}
     )
     select  StaticDataPopulationId,   ${flatcolumnlist}
@@ -372,14 +373,14 @@ begin try
 
 
     -- count how many records need to be inserted
-    select \@ct = count(*) from \@${table}
+    select \@ct = count(*) from \@${tableVarName}
 
     set \@i = 1
     -- insert the records into the ${table} table if they don't already exist, otherwise update them
     while \@i <=\@ct begin
 
         ${selectstatement}
-        from    \@${table}
+        from    \@${tableVarName}
         where   StaticDataPopulationId = \@i
 
         if not exists
@@ -558,12 +559,12 @@ sub columns {
 
     local $_    = undef ;
 
-    my $dbh          = shift or croak 'no dbh' ;
+    my $dbh     = shift or croak 'no dbh' ;
     my $schema  = shift or croak 'no schema' ;
     my $table   = shift or croak 'no table' ;
 
     my $sth2    = $dbh->prepare( columnsSQL());
-    my $rs      = $sth2->execute($schema,$table);
+    my $rs      = $sth2->execute($schema,$table,$schema,$table);
     my $res     = $sth2->fetchall_arrayref() ;
 
     if ( scalar @{$res} ) { return $res ; } ;
@@ -589,7 +590,7 @@ from    INFORMATION_SCHEMA.COLUMNS
 where   1=1
 and     TABLE_SCHEMA        = ?
 and     TABLE_NAME          = ?
-and     COLUMNPROPERTY(object_id(TABLE_NAME) , COLUMN_NAME,'IsComputed') != 1
+and     COLUMNPROPERTY(object_id(?+'.'+?) , COLUMN_NAME,'IsComputed') != 1
 EOF
 
 }

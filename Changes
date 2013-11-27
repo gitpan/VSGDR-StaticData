@@ -12,4 +12,6 @@ Revision history for VSGDR::StaticData
         Fixed quoting bug resulting from use of like a number on a line by line basis.
         Added cut-off limit on update reporting of a 100+.
         Added total non-updated count on update reporting of a 100+.
+0.06    27/11/2013
+        Bad bug fix.
         
