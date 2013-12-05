@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.06
+Version 0.07
 
 =cut
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 
 sub databaseName {
@@ -227,6 +227,7 @@ sub generateScript {
 #warn Dumper @{$ra_row} ;        
         for ( my $i = 0; $i < scalar @{$ra_row}; $i++ ) {
 #warn Dumper $ra_row->[$i] ;        
+            $ra_row->[$i] = ( defined $ra_row->[$i] ) ? $ra_row->[$i] : "null" ;
             $outVals[$i] = ( $ColumnNumericity[$i] == 1 ) ? $ra_row->[$i] : $dbh->quote($ra_row->[$i]) ;
         }
         #my @outVals = map { $ColumnNumericity{$_} == 1 ? $_ : $dbh->quote($_)  } @{$ra_row};
