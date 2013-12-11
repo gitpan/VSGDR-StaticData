@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.07
+Version 0.08
 
 =cut
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 
 sub databaseName {
@@ -579,7 +579,7 @@ sub columnsSQL {
 return <<"EOF" ;
 select  Column_name 
 ,       data_type
-,       case when character_maximum_length is not null then '('+cast(character_maximum_length as varchar(10))+')' else '' end 
+,       case when character_maximum_length is not null then '('+ case when character_maximum_length = -1 then 'max' else cast(character_maximum_length as varchar(10)) end+')' else '' end 
         as datasize
 ,       case when lower(Data_type) not like '%int%' and Numeric_precision is not null then '('+cast(Numeric_precision as varchar(10))+','+cast(Numeric_scale as varchar(10))+')' else '' end 
         as dataprecision

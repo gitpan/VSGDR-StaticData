@@ -16,4 +16,6 @@ Revision history for VSGDR::StaticData
         Bad bug fix.
 0.07    05/12/2013
         Bad bug fix - nulls weren't handled.
+0.08    11/12/2013
+        Size extension to cope with varchar(max)
         

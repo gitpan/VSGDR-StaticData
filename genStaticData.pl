@@ -21,7 +21,7 @@ my $schema          = ($opt_tablename =~ m{ \A ([^.]+) \. ([^.]+) \z }xms) ? $1 
 my $table           = ($opt_tablename =~ m{ \A ([^.]+) \. ([^.]+) \z }xms) ? $2 : $opt_tablename;
 die 'bad tablename' if $table =~ m{ \. }xms or $schema =~ m{ \. }xms; # it went wrong if we still have an embedded .
 
-my $dbh             = DBI->connect("dbi:ODBC:${opt_connection}", q{}, q{}, { AutoCommit => 1, RaiseError => 1 });
+my $dbh             = DBI->connect("dbi:ODBC:${opt_connection}", q{}, q{}, { LongReadLen => 512000, AutoCommit => 1, RaiseError => 1 });
 
 
 my $staticDataScript = VSGDR::StaticData::generateScript($dbh,$schema,$table) ;
