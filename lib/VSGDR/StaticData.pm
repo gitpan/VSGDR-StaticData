@@ -6,6 +6,7 @@ use warnings;
 use 5.010;
 
 use Scalar::Util qw(looks_like_number);
+use List::Util qw(max);
 use POSIX qw(strftime);
 use Carp;
 use DBI;
@@ -18,11 +19,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.08
+Version 0.09
 
 =cut
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 
 sub databaseName {
@@ -164,23 +165,38 @@ sub generateScript {
     
 
     my $variabledeclaration     = "declare\t" ;
-    my $tabledeclaration        = "\t(\tStaticDataPopulationId\t\tint\tnot null\n\t\t,\t" ;
+    my $tabledeclaration        = "(\t\tStaticDataPopulationId\t\tint\tnot null\n\t,\t\t" ;
     my $selectstatement         = "select\t" ;
-    my $insertclause            = "insert into ${combinedName}\n\t\t\t\t(";
+    my $insertclause            = "insert into ${combinedName}\n\t\t\t\t\t\t(";
     my $valuesclause            = "values(";
     my $flatcolumnlist          = "" ;
     my $flatvariablelist        = "" ;
     my $updateColumns           = "set\t";
     my $printStatement          = "" ;
 
+    my $widest_column_name_len = max ( map { length ($_->[0]); } @{$ra_columns} ) ;
+    my $widest_column_name_padding = int($widest_column_name_len/4) + 4;
+#warn Dumper     $widest_column_name_len;
+#warn Dumper     $widest_column_name_padding;
+
     foreach my $l (@{$ra_columns}) {
-        do { local $" = "\t"; $variabledeclaration      .= "@"."@{$l}[0,1,2,3,5]" ; $variabledeclaration .= "\n\t,\t\t"} ;
-        do { local $" = "\t"; $tabledeclaration         .= "@{$l}" ; $tabledeclaration .= "\n\t\t,\t"} ;
-        do { local $" = "";   $selectstatement          .= "@"."$l->[0]\t\t= $l->[0]" ; $selectstatement .= "\n\t\t,\t\t"} ;
+        my $varlen  = length($l->[0]) ;
+        my $colpadding = $widest_column_name_padding - (int(($varlen)/4));
+        my $varpadding = $widest_column_name_padding - (int(($varlen+1)/4));
+#warn Dumper     $l->[0];        
+#warn Dumper     $varlen;
+#warn Dumper     $padding;
+       
+#        do { local $" = "\t"; $variabledeclaration      .= "@"."@{$l}[0,1,2,3,5]" ; $variabledeclaration .= "\n\t,\t\t"} ;
+        do { local $" = "\t"; $variabledeclaration      .= "@"."@{$l}[0]". "\t"x$varpadding . "$$l[1]" ."@{$l}[2,3,5]" ; $variabledeclaration .= "\n\t,\t\t"} ;
+#        do { local $" = "\t"; $tabledeclaration         .= "@{$l}" ; $tabledeclaration .= "\n\t\t,\t"} ;
+        do { local $" = "\t"; $tabledeclaration         .= "@{$l}[0]". "\t"x$colpadding . "$$l[1]" ."@{$l}[2,3,4,5]" ; ; $tabledeclaration .= "\n\t,\t\t"} ;
+#        do { local $" = "";   $selectstatement          .= "@"."$l->[0]\t\t= $l->[0]" ; $selectstatement .= "\n\t\t,\t\t"} ;
+        do { local $" = "";   $selectstatement          .= "@"."$l->[0]" . "\t"x$varpadding ."= $l->[0]" ; $selectstatement .= "\n\t\t,\t\t"} ;
         do { local $" = "";   $insertclause             .= "$l->[0]" ; $insertclause .= ", "} ;    
         do { local $" = "";   $valuesclause             .= "$l->[0]" ; $valuesclause .= ", "} ;    
         do { local $" = "";   $flatcolumnlist           .= "$l->[0]" ; $flatcolumnlist .= ", "} ;
-        do { local $" = "";   $flatvariablelist         .= "@"."$l->[0]" ; $flatvariablelist .= ", "} ;
+        do { local $" = "";   $flatvariablelist         .= "@"."$l->[0]" ; $flatvariablelist .= ","} ;
 
         do { local $" = "";   $printStatement           .= "'  $$l[0]: ' " ; } ;
         my $printFragment                               = $$l[1] !~ m{ (?: char ) }ixms 
@@ -199,15 +215,15 @@ sub generateScript {
     $tabledeclaration         =~ s{ \n\t\t,\t \z }{}msx;
     $selectstatement          =~ s{ \n\t\t,\t\t \z }{}msx;
     $updateColumns            =~ s{ \n\t\t\t,\t \z }{}msx;
-    $insertclause             =~ s{ ,\s \z }{}msx;
-    $valuesclause             =~ s{ ,\s \z }{}msx;
-    $flatcolumnlist           =~ s{ ,\s \z }{}msx;
-    $flatvariablelist         =~ s{ ,\s \z }{}msx;
+    $insertclause             =~ s{ ,\s? \z }{}msx;
+    $valuesclause             =~ s{ ,\s? \z }{}msx;
+    $flatcolumnlist           =~ s{ ,\s? \z }{}msx;
+    $flatvariablelist         =~ s{ ,\s? \z }{}msx;
     $updateColumns            =~ s{ \n\t\t\t\t\t,\t \z }{}msx;
     $printStatement           =~ s{ \+\s \z }{}msx;
 
 
-    $tabledeclaration   .= "\n\t\t)";
+    $tabledeclaration   .= "\n\t)";
     $insertclause       .= ")";
     $valuesclause       .= ")";
 
@@ -218,7 +234,7 @@ sub generateScript {
     my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column);
 
     my @valuesTable     = undef;
-    my $valuesClause    = "values\n\t\t";
+    my $valuesClause    = "values\n\t\t\t";
 
     my $lno             = 1;
     foreach my $ra_row (@{$ra_data}){
@@ -363,9 +379,9 @@ begin try
     )
     insert  into
             \@${tableVarName} 
-    (       StaticDataPopulationId,             ${flatcolumnlist}
+    (       StaticDataPopulationId, ${flatcolumnlist}
     )
-    select  StaticDataPopulationId,   ${flatcolumnlist}
+    select  StaticDataPopulationId, ${flatcolumnlist}
     from    src
 
     ${variabledeclaration}        
@@ -382,7 +398,7 @@ begin try
 
         ${selectstatement}
         from    \@${tableVarName}
-        where   StaticDataPopulationId = \@i
+        where   StaticDataPopulationId\t\t= \@i
 
         if not exists
                 (

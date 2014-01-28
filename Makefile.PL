@@ -24,6 +24,7 @@ WriteMakefile(
         'Data::Dumper'          => 0,
         'Getopt::Euclid'        => 0,
         'Graph'                 => 0.90,
+        'List::Util'            => 1.00,
         'Modern::Perl'          => 0,
         'POSIX'                 => 0,
         'autodie'               => 0,
