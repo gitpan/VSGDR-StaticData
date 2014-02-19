@@ -32,4 +32,4 @@ requires:
   indirect: 0
   perl: 0
   version: 0
-version: 0.09
+version: 0.10
