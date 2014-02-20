@@ -5,7 +5,6 @@ use warnings;
 
 use 5.010;
 
-use Scalar::Util qw(looks_like_number);
 use List::Util qw(max);
 use POSIX qw(strftime);
 use Carp;
@@ -19,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.11
+Version 0.12
 
 =cut
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 
 sub databaseName {
@@ -212,7 +211,7 @@ sub generateScript {
 
     # trim off erroneous trailing cruft - better to resign array interpolations above .
     $variabledeclaration      =~ s{ \n\t,\t\t \z }{}msx;
-    $tabledeclaration         =~ s{ \n\t\t,\t\t \z }{}msx;
+    $tabledeclaration         =~ s{ \n\t,\t\t \z }{}msx;
     $selectstatement          =~ s{ \n\t\t,\t\t \z }{}msx;
     $updateColumns            =~ s{ \n\t\t\t,\t \z }{}msx;
     $insertclause             =~ s{ ,\s? \z }{}msx;
