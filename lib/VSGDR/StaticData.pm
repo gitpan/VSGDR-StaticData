@@ -19,11 +19,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.10
+Version 0.11
 
 =cut
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 
 sub databaseName {
@@ -212,7 +212,7 @@ sub generateScript {
 
     # trim off erroneous trailing cruft - better to resign array interpolations above .
     $variabledeclaration      =~ s{ \n\t,\t\t \z }{}msx;
-    $tabledeclaration         =~ s{ \n\t\t,\t \z }{}msx;
+    $tabledeclaration         =~ s{ \n\t\t,\t\t \z }{}msx;
     $selectstatement          =~ s{ \n\t\t,\t\t \z }{}msx;
     $updateColumns            =~ s{ \n\t\t\t,\t \z }{}msx;
     $insertclause             =~ s{ ,\s? \z }{}msx;

@@ -22,4 +22,6 @@ Revision history for VSGDR::StaticData
         Cosmetic changes to output
 0.10    19/02/2014
         Fixed non-numeric null value handling.
+0.11    20/02/2014
+        Stupid trailing column bug introduce in 0.08 removed.
         
