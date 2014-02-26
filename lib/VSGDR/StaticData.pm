@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.12
+Version 0.13
 
 =cut
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 
 sub databaseName {
@@ -131,7 +131,7 @@ sub generateScript {
 #    croak 'Unusable Primary Key defined'    unless scalar @{$ra_pkcolumns} == 1;
 
     my @ColumnNumericity = map { $_->[1] =~ m{char|text|date}i ? 0 : 1 ;  } @{$ra_columns} ;
-
+#warn Dumper $ra_columns;
 #warn Dumper @ColumnNumericity ;
 #exit;
 
@@ -230,7 +230,7 @@ sub generateScript {
     my $updatingPrintStatement  = "'Updating ${combinedName}: ' + " . $printStatement;
 
 
-    my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column);
+    my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column,$flatcolumnlist);
 
     my @valuesTable     = undef;
     my $valuesClause    = "values\n\t\t\t";
@@ -240,6 +240,7 @@ sub generateScript {
     #    warn Dumper $ra_row;
         my @outVals = () ;
 #warn Dumper @{$ra_row} ;        
+#exit;
         for ( my $i = 0; $i < scalar @{$ra_row}; $i++ ) {
 #warn Dumper $ra_row->[$i] ;    
 #warn Dumper $ColumnNumericity[$i] ;
@@ -475,8 +476,9 @@ sub getCurrentTableData {
     my $dbh          = shift or croak 'no dbh' ;
     my $combinedName = shift or croak 'no table' ;
     my $pkCol        = shift ; #or croak 'no primary key' ;
+    my $cols         = shift ; #or croak 'no primary key' ;
 
-    my $sth2 = $dbh->prepare(getCurrentTableDataSQL($combinedName,$pkCol));
+    my $sth2 = $dbh->prepare(getCurrentTableDataSQL($combinedName,$pkCol,$cols));
     my $rs   = $sth2->execute();
     my $res  = $sth2->fetchall_arrayref() ;
 
@@ -490,6 +492,7 @@ sub getCurrentTableDataSQL {
     
     my $combinedName = shift or croak 'no table' ;
     my $pkCol        = shift ; #or croak 'no primary key' ;
+    my $cols         = shift ; #or croak 'no primary key' ;
     
     my $orderBy      = "" ; 
     
@@ -502,8 +505,8 @@ sub getCurrentTableDataSQL {
 
 return <<"EOF" ;
 
-select  *
-from    $combinedName so
+select  ${cols}
+from    ${combinedName} so
 ${orderBy}
 
 EOF

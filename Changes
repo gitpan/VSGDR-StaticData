@@ -26,4 +26,6 @@ Revision history for VSGDR::StaticData
         Stupid trailing column bug introduce in 0.08 removed.
 0.12    20/02/2014
         Removed some obsolete dependencies.
+0.13    26/02/2014
+        Fixed data retrieval for computed columns
         
