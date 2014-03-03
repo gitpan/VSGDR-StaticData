@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.13
+Version 0.14
 
 =cut
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 
 sub databaseName {
@@ -141,15 +141,34 @@ sub generateScript {
 
     my @nonKeyColumns           = () ;
 
+
+    my $widest_column_name_len = max ( map { length ($_->[0]); } @{$ra_columns} ) ;
+    my $widest_column_name_padding = int($widest_column_name_len/4) + 4;
     
     if ( ! scalar @{$ra_pkcolumns} ) {
-        my @pk_ColumnsCheck     = map { "( $_->[0]\t\t\t = \@$_->[0] or ( $_->[0]\t\t\t is null and \@$_->[0] is null ) ) " } @{$ra_columns} ;
-        $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\tand\t"; "@pk_ColumnsCheck" }  
+        my @pk_ColumnsCheck = () ;
+        foreach my $l (@{$ra_columns}) {
+            my $varlen  = length($l->[0]) ;
+            my $colpadding = $widest_column_name_padding - (int(($varlen)/4));
+            my $varpadding = $widest_column_name_padding - (int(($varlen+1)/4));
+            push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = $l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and $l->[0] ". "\t"x$varpadding . " is null ) ) " ;
+        }
+        #my @pk_ColumnsCheck     = map { "( $_->[0]\t\t\t = \@$_->[0] or ( $_->[0]\t\t\t is null and \@$_->[0] is null ) ) " } @{$ra_columns} ;
+        $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\t\t\tand\t\t"; "@pk_ColumnsCheck" }  
     }
     elsif ( scalar @{$ra_pkcolumns} != 1 ) {
-        my @pk_ColumnsCheck     = map { "$_->[0]\t\t\t = \@$_->[0]" } @{$ra_columns} ;
-        $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\tand\t"; "@pk_ColumnsCheck" }  ;
+        my @pk_ColumnsCheck = () ;
 
+        foreach my $l (@{$ra_columns}) {
+            my $varlen  = length($l->[0]) ;
+            my $colpadding = $widest_column_name_padding - (int(($varlen)/4));
+            my $varpadding = $widest_column_name_padding - (int(($varlen+1)/4));
+            push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = $l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and $l->[0] ". "\t"x$varpadding . " is null ) ) " ;
+
+#        my @pk_ColumnsCheck     = map { "$_->[0]\t\t\t = \@$_->[0]" } @{$ra_columns} ;
+        }
+        $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\t\t\tand\t\t"; "@pk_ColumnsCheck" }  ;
+        
         foreach my $col (@{$ra_columns}) {
 #warn Dumper @{$ra_columns};
 #warn Dumper $col;
@@ -173,8 +192,6 @@ sub generateScript {
     my $updateColumns           = "set\t";
     my $printStatement          = "" ;
 
-    my $widest_column_name_len = max ( map { length ($_->[0]); } @{$ra_columns} ) ;
-    my $widest_column_name_padding = int($widest_column_name_len/4) + 4;
 #warn Dumper     $widest_column_name_len;
 #warn Dumper     $widest_column_name_padding;
 
