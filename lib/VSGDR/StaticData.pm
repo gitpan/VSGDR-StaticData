@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.16
+Version 0.17
 
 =cut
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 
 sub databaseName {
@@ -153,7 +153,7 @@ sub generateScript {
             my $varlen  = length($l->[0]) ;
             my $colpadding = $widest_column_name_padding - (int(($varlen)/4));
             my $varpadding = $widest_column_name_padding - (int(($varlen+1)/4));
-            push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = $l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and $l->[0] ". "\t"x$varpadding . " is null ) ) " ;
+            push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = \@$l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and \@$l->[0] ". "\t"x$varpadding . " is null ) ) " ;
         }
         #my @pk_ColumnsCheck     = map { "( $_->[0]\t\t\t = \@$_->[0] or ( $_->[0]\t\t\t is null and \@$_->[0] is null ) ) " } @{$ra_columns} ;
         $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\t\t\tand\t\t"; "@pk_ColumnsCheck" }  
@@ -165,7 +165,7 @@ sub generateScript {
             my $varlen  = length($l->[0]) ;
             my $colpadding = $widest_column_name_padding - (int(($varlen)/4));
             my $varpadding = $widest_column_name_padding - (int(($varlen+1)/4));
-            push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = $l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and $l->[0] ". "\t"x$varpadding . " is null ) ) " ;
+            push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = \@$l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and \@$l->[0] ". "\t"x$varpadding . " is null ) ) " ;
 
 #        my @pk_ColumnsCheck     = map { "$_->[0]\t\t\t = \@$_->[0]" } @{$ra_columns} ;
         }

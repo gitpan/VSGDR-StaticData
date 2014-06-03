@@ -34,5 +34,7 @@ Revision history for VSGDR::StaticData
         Corrections to reporting of altered records count.
 0.16    03/06/2014
         Added a check that the table name is a valid table name (before we hit a cryptic runtime error.)
+0.17    03/06/2014
+        Fixed introduced bug.
         
         
