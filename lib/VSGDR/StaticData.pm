@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.14
+Version 0.16
 
 =cut
 
-our $VERSION = '0.14';
+our $VERSION = '0.16';
 
 
 sub databaseName {
@@ -124,6 +124,8 @@ sub generateScript {
     my $ra_columns              = columns($dbh,$schema,$table);
     my $ra_pkcolumns            = pkcolumns($dbh,$schema,$table);
 
+    croak "${combinedName} doesn't appear to be a valid table"          unless scalar @{$ra_columns};
+    
 #warn Dumper $ra_columns ;
 #exit ;
 
@@ -300,7 +302,7 @@ EOF
     if ( scalar @{$ra_data} > 30  ){
         $elsePrintSection        = <<"EOF";
 else  begin
-                set \@UnchangedCount += 1 ;
+                set \@ChangedCount += 1 ;
             end 
 EOF
     }
@@ -338,11 +340,11 @@ EOF
     my $tmp_sv = substr(${table},0,20) ;
     my $savePointName = "sc_${tmp_sv}_SP";    
 
-    my ${printUnchangedTotalsSection} = "" ;
+    my ${printChangedTotalsSection} = "" ;
 #warn Dumper @nonKeyColumns ;
 
     if ( scalar @{$ra_data} > 30  ){
-        $printUnchangedTotalsSection        = "print 'Total count of unaltered records : ' + cast( \@UnchangedCount as varchar(10))" ;
+        $printChangedTotalsSection        = "print 'Total count of altered records : ' + cast( \@ChangedCount as varchar(10))" ;
     }
 
 
@@ -387,7 +389,7 @@ begin try
     -- Declarations
     declare \@ct                         int          
     ,       \@i                          int  
-    ,       \@UnchangedCount             int = 0
+    ,       \@ChangedCount             int = 0
 
     declare \@localTransactionStarted bit;
 
@@ -452,7 +454,7 @@ begin try
     commit
 
 
-    ${printUnchangedTotalsSection}
+    ${printChangedTotalsSection}
 
 end try
 begin catch

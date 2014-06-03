@@ -30,5 +30,9 @@ Revision history for VSGDR::StaticData
         Fixed data retrieval for computed columns
 0.14    03/03/2014
         Minor cosmetic layout changes
+0.15    05/03/2014
+        Corrections to reporting of altered records count.
+0.16    03/06/2014
+        Added a check that the table name is a valid table name (before we hit a cryptic runtime error.)
         
         
