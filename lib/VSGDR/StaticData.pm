@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.18
+Version 0.20
 
 =cut
 
-our $VERSION = '0.18';
+our $VERSION = '0.20';
 
 
 sub databaseName {
@@ -102,10 +102,13 @@ sub generateScript {
     croak "bad arg schema"  unless defined $schema;
     croak "bad arg table"   unless defined $table;
 
-    my $combinedName    = "${schema}.${table}"; 
-    my $tableVarName    = "LocalTable_${table}"; 
+    $schema = substr $schema, 1, -1 if $schema =~ m/\A \[ .+ \] \Z /msix;
+    $table  = substr $table,  1, -1 if $table  =~ m/\A \[ .+ \] \Z /msix;
+    my $combinedName            = "${schema}.${table}"; 
+    my $quotedCombinedName      = "[${schema}].[${table}]"; 
+    my $tableVarName            = "LocalTable_${table}"; 
 
-    my $database        = databaseName($dbh);
+    my $database                = databaseName($dbh);
 
     no warnings;
     my $userName        = @{[getpwuid( $< )]}->[6]; $userName =~ s/,.*//;
@@ -115,6 +118,11 @@ sub generateScript {
 
 
     my $hasId                   = has_idCols($dbh,$schema,$table) ;
+    my $idCol                   = undef ;
+    if ($hasId) {
+        $idCol                  = idCols($dbh,$schema,$table) ;
+    }
+#warn Dumper $idCol ;    
     my $set_IDENTITY_INSERT_ON  = "";
     my $set_IDENTITY_INSERT_OFF = "";
     $set_IDENTITY_INSERT_ON     = "set IDENTITY_INSERT ${combinedName} ON"  if $hasId;
@@ -225,7 +233,14 @@ sub generateScript {
         $printStatement .= $printFragment ;
     }
     foreach my $l (@nonKeyColumns) {
-        do { local $" = "";   $updateColumns            .= "$l->[0]\t\t= "."@"."$l->[0]" ; $updateColumns .= "\n\t\t\t\t\t,\t"} ;
+        # create update statement for each non-identity column.
+        if ( ! $hasId || ( $l->[0] ne $idCol ) ) {
+#warn Dumper $l;            
+            do { local $" = "";   $updateColumns            .= "$l->[0]\t\t= "."@"."$l->[0]" ; $updateColumns .= "\n\t\t\t\t\t,\t"} ;
+        }
+        elsif($hasId)  {
+            do { local $" = "";   $updateColumns            .= "-- cannot update this identity column -- $l->[0]\t\t= "."@"."$l->[0]" ; $updateColumns .= "\n\t\t\t\t\t,\t"} ;
+        }
     }
 
     # trim off erroneous trailing cruft - better to resign array interpolations above .
@@ -249,7 +264,9 @@ sub generateScript {
     my $updatingPrintStatement  = "'Updating ${combinedName}: ' + " . $printStatement;
 
 
-    my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column,$flatcolumnlist);
+#    my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column,$flatcolumnlist);
+    my $ra_data = getCurrentTableData($dbh,$quotedCombinedName    ,$pk_column,$flatcolumnlist);
+
 
     my @valuesTable     = undef;
     my $valuesClause    = "values\n\t\t\t";
@@ -318,7 +335,7 @@ EOF
             if exists 
                 (
                 select  ${flatcolumnlist}
-                from    $combinedName
+                from    $quotedCombinedName
                 ${primaryKeyCheckClause}
                 except
                 select  ${flatvariablelist}
@@ -327,7 +344,7 @@ EOF
                 if \@DeploySwitch = 1 begin
                     update  s
                     ${updateColumns}
-                    from    $combinedName s
+                    from    $quotedCombinedName s
                     ${primaryKeyCheckClause}
                 end
             end
@@ -435,7 +452,7 @@ begin try
         if not exists
                 (
                 select  * 
-                from    $combinedName
+                from    $quotedCombinedName
                 ${primaryKeyCheckClause}
                 )  begin
             print $insertingPrintStatement
@@ -532,14 +549,45 @@ EOF
 
 }
 
+sub idCols {
+
+    local $_ = undef ;
+    
+    my $dbh    = shift or croak 'no dbh' ;
+    my $schema = shift or croak 'no schema' ;
+    my $table  = shift or croak 'no table' ;
+
+    my $sth2 = $dbh->prepare(idColsSQL());
+    my $rs   = $sth2->execute($schema,$table);
+    my $res  = $sth2->fetchall_arrayref() ;
+
+    return $$res[0][0] ;
+
+}
+
+sub idColsSQL {
+
+return <<"EOF" ;
+
+select  sc.name as ID_COL
+FROM    dbo.sysobjects so
+join    dbo.syscolumns sc
+on      so.id               = sc.id
+and     sc.colstat & 1      = 1
+where   schema_name(so.uid) = ?
+and     so.name             = ?
+
+EOF
+
+}
 
 sub has_idCols {
 
     local $_ = undef ;
     
-    my $dbh          = shift or croak 'no dbh' ;
-    my $schema = shift or croak 'no schema' ;
-    my $table = shift or croak 'no table' ;
+    my $dbh     = shift or croak 'no dbh' ;
+    my $schema  = shift or croak 'no schema' ;
+    my $table   = shift or croak 'no table' ;
 
     my $sth2 = $dbh->prepare(has_idColsSQL());
     my $rs   = $sth2->execute($schema,$table);
@@ -555,7 +603,7 @@ return <<"EOF" ;
 
 select  1 as ID_COL
 FROM    dbo.sysobjects so
-where   user_name(so.uid)   = ?
+where   schema_name(so.uid) = ?
 and     so.name             = ?
 and     exists (
         select *
