@@ -36,5 +36,8 @@ Revision history for VSGDR::StaticData
         Added a check that the table name is a valid table name (before we hit a cryptic runtime error.)
 0.17    03/06/2014
         Fixed introduced bug.
+0.18    11/06/2014
+        Enhanced to use a unique key for a table where a primary key is not defined.  Unique indexes are NOT covered by this change.
+        
         
         

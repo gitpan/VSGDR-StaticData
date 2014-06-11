@@ -18,11 +18,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.17
+Version 0.18
 
 =cut
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 
 sub databaseName {
@@ -577,7 +577,7 @@ sub pkcolumns {
     my $table   = shift or croak 'no table' ;
 
     my $sth2    = $dbh->prepare( pkcolumnsSQL());
-    my $rs      = $sth2->execute($schema,$table);
+    my $rs      = $sth2->execute($schema,$table,$schema,$table);
     my $res     = $sth2->fetchall_arrayref() ;
 
     if ( scalar @{$res} ) { return $res ; } ;
@@ -589,6 +589,15 @@ sub pkcolumns {
 sub pkcolumnsSQL {
 
 return <<"EOF" ;
+
+; with ranking as (
+select  CONSTRAINT_SCHEMA, CONSTRAINT_NAME
+,       row_number() over (order by case when tc.CONSTRAINT_TYPE = 'PRIMARY KEY' then 1 else 2 end )  as rn
+        from    INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+where   tc.CONSTRAINT_TYPE          in( 'PRIMARY KEY','UNIQUE' )
+and     tc.TABLE_SCHEMA             = ?
+and     tc.TABLE_NAME               = ?
+)
 select  COLUMN_NAME 
 from    INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
 join    INFORMATION_SCHEMA.KEY_COLUMN_USAGE  kcu
@@ -596,10 +605,15 @@ on      tc.TABLE_CATALOG            = kcu.TABLE_CATALOG
 and     tc.TABLE_SCHEMA             = kcu.TABLE_SCHEMA
 and     tc.TABLE_NAME               = kcu.TABLE_NAME
 and     tc.CONSTRAINT_NAME          = kcu.CONSTRAINT_NAME
-where   tc.CONSTRAINT_TYPE          = 'PRIMARY KEY'
+join    ranking rk 
+on      tc.CONSTRAINT_SCHEMA        = rk.CONSTRAINT_SCHEMA
+and     tc.CONSTRAINT_NAME          = rk.CONSTRAINT_NAME
+where   tc.CONSTRAINT_TYPE          in( 'PRIMARY KEY','UNIQUE' )
 and     tc.TABLE_SCHEMA             = ?
 and     tc.TABLE_NAME               = ?
-order   by ORDINAL_POSITION
+and     rn = 1
+order   by      
+        ORDINAL_POSITION
 
 EOF
 
