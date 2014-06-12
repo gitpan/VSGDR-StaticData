@@ -42,6 +42,9 @@ Revision history for VSGDR::StaticData
         Better support for standard MS quoted table names and schemas.
 0.20    11/06/2014
         Better support for non-pk identity columns.
+0.21    12/06/2014
+        Fixed bug in multiple pk/un selection.  Fixed reporting of large-scale changes.
+        Bugs identified in handling of multiple column primary key or unique constraints.
         
         
         

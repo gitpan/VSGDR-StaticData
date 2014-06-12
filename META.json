@@ -1,5 +1,5 @@
 {
-   "abstract" : "Static data script support package for SSDT post-deployment steps, Ded MedVed..\r",
+   "abstract" : "Static data script support package for SSDT post-deployment steps, Ded MedVed.\r",
    "author" : [
       "Ded MedVed <dedmedved@cpan>"
    ],
@@ -48,5 +48,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.20"
+   "version" : "0.21"
 }

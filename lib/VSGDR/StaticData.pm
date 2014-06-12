@@ -11,18 +11,19 @@ use Carp;
 use DBI;
 use Data::Dumper;
 
+##TODO 1. Fix multi-column primary/unique keys.
 
 =head1 NAME
 
-VSGDR::StaticData - Static data script support package for SSDT post-deployment steps, Ded MedVed..
+VSGDR::StaticData - Static data script support package for SSDT post-deployment steps, Ded MedVed.
 
 =head1 VERSION
 
-Version 0.20
+Version 0.21
 
 =cut
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 
 sub databaseName {
@@ -31,9 +32,9 @@ sub databaseName {
 
     my $dbh     = shift ;
 
-    my $sth2 = $dbh->prepare(databaseNameSQL());
-    my $rs   = $sth2->execute();
-    my $res  = $sth2->fetchall_arrayref() ;
+    my $sth2    = $dbh->prepare(databaseNameSQL());
+    my $rs      = $sth2->execute();
+    my $res     = $sth2->fetchall_arrayref() ;
 
     return $$res[0][0] ;
 
@@ -92,11 +93,13 @@ EOF
 
 sub generateScript {
 
-    local $_ = undef;
+    my ${LargeDataSetThreshhold}    = 30 ;
 
-    my $dbh     = shift ;
-    my $schema  = shift ;
-    my $table   = shift ;
+    local $_                        = undef;
+        
+    my $dbh                         = shift ;
+    my $schema                      = shift ;
+    my $table                       = shift ;
 
     croak "bad arg dbh"     unless defined $dbh;
     croak "bad arg schema"  unless defined $schema;
@@ -155,6 +158,8 @@ sub generateScript {
     my $widest_column_name_len = max ( map { length ($_->[0]); } @{$ra_columns} ) ;
     my $widest_column_name_padding = int($widest_column_name_len/4) + 4;
     
+    my $reportingPKCols = "" ;
+    
     if ( ! scalar @{$ra_pkcolumns} ) {
         my @pk_ColumnsCheck = () ;
         foreach my $l (@{$ra_columns}) {
@@ -175,6 +180,9 @@ sub generateScript {
             my $varpadding = $widest_column_name_padding - (int(($varlen+1)/4));
             push @pk_ColumnsCheck , "($l->[0]" . "\t"x$varpadding . " = \@$l->[0]" . "\t"x$varpadding . "or ($l->[0]". "\t"x$varpadding . " is null and \@$l->[0] ". "\t"x$varpadding . " is null ) ) " ;
 
+        my @reportingPKCols         = map { "$_->[0]" } @{$ra_columns} ;
+        $reportingPKCols            = do {local $" = ", "; "@reportingPKCols"} ;
+
 #        my @pk_ColumnsCheck     = map { "$_->[0]\t\t\t = \@$_->[0]" } @{$ra_columns} ;
         }
         $primaryKeyCheckClause  = "where\t" . do { local $" = "\n\t\t\t\tand\t\t"; "@pk_ColumnsCheck" }  ;
@@ -186,6 +194,7 @@ sub generateScript {
         }
     }
     else {
+        $reportingPKCols        = $ra_pkcolumns->[0][0];     
         $pk_column              = $ra_pkcolumns->[0][0];        
         $primaryKeyCheckClause  = "where   ${pk_column}        = \@${pk_column}";
         @nonKeyColumns = grep { $_->[0] ne $pk_column } @{$ra_columns};        
@@ -239,7 +248,7 @@ sub generateScript {
             do { local $" = "";   $updateColumns            .= "$l->[0]\t\t= "."@"."$l->[0]" ; $updateColumns .= "\n\t\t\t\t\t,\t"} ;
         }
         elsif($hasId)  {
-            do { local $" = "";   $updateColumns            .= "-- cannot update this identity column -- $l->[0]\t\t= "."@"."$l->[0]" ; $updateColumns .= "\n\t\t\t\t\t,\t"} ;
+            do { local $" = "";   $updateColumns            .= "/* cannot update this identity column -- $l->[0]\t\t= "."@"."$l->[0]" ; $updateColumns .= "\n\t\t\t\t\t,*/\t"} ;
         }
     }
 
@@ -260,8 +269,8 @@ sub generateScript {
     $insertclause       .= ")";
     $valuesclause       .= ")";
 
-    my $insertingPrintStatement = "'Inserting ${combinedName}:' + " . $printStatement ;
-    my $updatingPrintStatement  = "'Updating ${combinedName}: ' + " . $printStatement;
+    my $insertingPrintStatement = "print 'Inserting ${combinedName}:' + " . $printStatement ;
+    my $updatingPrintStatement  = "print 'Updating ${combinedName}: ' + " . $printStatement;
 
 
 #    my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column,$flatcolumnlist);
@@ -306,8 +315,8 @@ sub generateScript {
     my $noopPrintStatement      = "'Nothing to update. Values are unchanged.'";
     my $printNoOpStatement      = "print ${noopPrintStatement}" ;
     if ( ${pk_column} ) {
-        $noopPrintStatement     = "'Nothing to update. ${combinedName}: Values are unchanged for Primary Key: '";    
-        $printNoOpStatement     = "print ${noopPrintStatement} + cast(\@${pk_column} as varchar(10)) "
+        $noopPrintStatement     = "'Nothing to update. ${combinedName}: Values are unchanged for Primary/Unique Key: '";    
+        $printNoOpStatement     = "print ${noopPrintStatement} + cast(\@${reportingPKCols} as varchar(1000)) "        
     }
     
     my $elsePrintSection        = <<"EOF";
@@ -316,12 +325,10 @@ else  begin
             end 
 EOF
 
-    if ( scalar @{$ra_data} > 30  ){
-        $elsePrintSection        = <<"EOF";
-else  begin
-                set \@ChangedCount += 1 ;
-            end 
-EOF
+    if ( scalar @{$ra_data} > ${LargeDataSetThreshhold}  ){
+        $insertingPrintStatement = "" ;
+        $updatingPrintStatement  = "" ;
+        $elsePrintSection        = "" ;
     }
 
     my ${elseBlock} = "";
@@ -340,15 +347,16 @@ EOF
                 except
                 select  ${flatvariablelist}
                 ) begin
-                print $updatingPrintStatement
+                $updatingPrintStatement
                 if \@DeploySwitch = 1 begin
                     update  s
                     ${updateColumns}
                     from    $quotedCombinedName s
                     ${primaryKeyCheckClause}
                 end
+                set \@ChangedCount += 1 ;
             end
-            ${elsePrintSection}
+        ${elsePrintSection}        
         end
 EOF
     } 
@@ -360,8 +368,9 @@ EOF
     my ${printChangedTotalsSection} = "" ;
 #warn Dumper @nonKeyColumns ;
 
-    if ( scalar @{$ra_data} > 30  ){
-        $printChangedTotalsSection        = "print 'Total count of altered records : ' + cast( \@ChangedCount as varchar(10))" ;
+    if ( scalar @{$ra_data} > ${LargeDataSetThreshhold}  ){
+        $printChangedTotalsSection        = "print 'Total count of inserted records : ' + cast( \@InsertedCount as varchar(10))" ;
+        $printChangedTotalsSection        .= "\nprint 'Total count of altered records  : ' + cast( \@ChangedCount as varchar(10))" ;
     }
 
 
@@ -404,8 +413,9 @@ else
 begin try
 
     -- Declarations
-    declare \@ct                         int          
-    ,       \@i                          int  
+    declare \@ct                       int          
+    ,       \@i                        int  
+    ,       \@InsertedCount            int = 0
     ,       \@ChangedCount             int = 0
 
     declare \@localTransactionStarted bit;
@@ -455,13 +465,14 @@ begin try
                 from    $quotedCombinedName
                 ${primaryKeyCheckClause}
                 )  begin
-            print $insertingPrintStatement
+            $insertingPrintStatement
             if \@DeploySwitch = 1 begin
                 ${set_IDENTITY_INSERT_ON}
                 ${insertclause}
                 values (${flatvariablelist})
                 ${set_IDENTITY_INSERT_OFF}
             end
+            set \@InsertedCount += 1 ;
         end
         ${elseBlock}
 
@@ -476,7 +487,6 @@ begin try
 end try
 begin catch
 
-    print error_message() 
     -- Rollback any locally begun transaction.  Don't fail the whole deployment if it's transactional.
     -- If our transaction is the only one, then just rollback.
     if \@\@trancount > 0 begin
@@ -489,7 +499,7 @@ begin catch
             else rollback
     end
 
-    print 'Deployment of ${table} static data for developer deployment failed .'
+    print 'Deployment of ${combinedName} static data failed.  This script was rolled back.'
     print error_message()
     
     ${set_IDENTITY_INSERT_OFF}
@@ -640,7 +650,7 @@ return <<"EOF" ;
 
 ; with ranking as (
 select  CONSTRAINT_SCHEMA, CONSTRAINT_NAME
-,       row_number() over (order by case when tc.CONSTRAINT_TYPE = 'PRIMARY KEY' then 1 else 2 end )  as rn
+,       row_number() over (order by case when tc.CONSTRAINT_TYPE = 'PRIMARY KEY' then 1 else 2 end, CONSTRAINT_NAME )  as rn
         from    INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
 where   tc.CONSTRAINT_TYPE          in( 'PRIMARY KEY','UNIQUE' )
 and     tc.TABLE_SCHEMA             = ?

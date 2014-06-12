@@ -1,5 +1,5 @@
 ---
-abstract: "Static data script support package for SSDT post-deployment steps, Ded MedVed..\r"
+abstract: "Static data script support package for SSDT post-deployment steps, Ded MedVed.\r"
 author:
   - 'Ded MedVed <dedmedved@cpan>'
 build_requires:
@@ -30,4 +30,4 @@ requires:
   indirect: 0
   perl: 0
   version: 0
-version: 0.20
+version: 0.21
