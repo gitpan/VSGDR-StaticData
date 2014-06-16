@@ -12,6 +12,7 @@ use DBI;
 use Data::Dumper;
 
 ##TODO 1. Fix multi-column primary/unique keys.
+##TODO 2. Check that non-key identity columns are handled correctly when they occur in the final position in the table.
 
 =head1 NAME
 
@@ -19,11 +20,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.21
+Version 0.22
 
 =cut
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 
 sub databaseName {
@@ -93,30 +94,30 @@ EOF
 
 sub generateScript {
 
-    my ${LargeDataSetThreshhold}    = 30 ;
+    my ${LargeDataSetThreshhold}        = 30 ;
+    
+    local $_                            = undef;
+            
+    my $dbh                             = shift ;
+    my $schema                          = shift ;
+    my $table                           = shift ;
 
-    local $_                        = undef;
-        
-    my $dbh                         = shift ;
-    my $schema                      = shift ;
-    my $table                       = shift ;
+    croak "bad arg dbh"                 unless defined $dbh;
+    croak "bad arg schema"              unless defined $schema;
+    croak "bad arg table"               unless defined $table;
 
-    croak "bad arg dbh"     unless defined $dbh;
-    croak "bad arg schema"  unless defined $schema;
-    croak "bad arg table"   unless defined $table;
-
-    $schema = substr $schema, 1, -1 if $schema =~ m/\A \[ .+ \] \Z /msix;
-    $table  = substr $table,  1, -1 if $table  =~ m/\A \[ .+ \] \Z /msix;
-    my $combinedName            = "${schema}.${table}"; 
-    my $quotedCombinedName      = "[${schema}].[${table}]"; 
-    my $tableVarName            = "LocalTable_${table}"; 
-
-    my $database                = databaseName($dbh);
+    $schema = substr $schema, 1, -1     if $schema =~ m/\A \[ .+ \] \Z /msix;
+    $table  = substr $table,  1, -1     if $table  =~ m/\A \[ .+ \] \Z /msix;
+    my $combinedName                    = "${schema}.${table}"; 
+    my $quotedCombinedName              = "[${schema}].[${table}]"; 
+    my $tableVarName                    = "LocalTable_${table}"; 
+       
+    my $database                        = databaseName($dbh);
 
     no warnings;
-    my $userName        = @{[getpwuid( $< )]}->[6]; $userName =~ s/,.*//;
-    use warnings;
-    my $date            = strftime "%d/%m/%Y", localtime;
+    my $userName                        = @{[getpwuid( $< )]}->[6]; $userName =~ s/,.*//;
+    use warnings;                      
+    my $date                            = strftime "%d/%m/%Y", localtime;
 
 
 
@@ -143,9 +144,9 @@ sub generateScript {
 #    croak 'No Primary Key defined'          unless scalar @{$ra_pkcolumns};
 #    croak 'Unusable Primary Key defined'    unless scalar @{$ra_pkcolumns} == 1;
 
-    my @ColumnNumericity = map { $_->[1] =~ m{char|text|date}i ? 0 : 1 ;  } @{$ra_columns} ;
+    my @IsColumnNumeric = map { $_->[1] =~ m{char|text|date}i ? 0 : 1 ;  } @{$ra_columns} ;
 #warn Dumper $ra_columns;
-#warn Dumper @ColumnNumericity ;
+#warn Dumper @IsColumnNumeric ;
 #exit;
 
     my $primaryKeyCheckClause   = "";
@@ -207,6 +208,7 @@ sub generateScript {
     my $insertclause            = "insert into ${combinedName}\n\t\t\t\t\t\t(";
     my $valuesclause            = "values(";
     my $flatcolumnlist          = "" ;
+    my $flatExtractColumnList   = "" ;
     my $flatvariablelist        = "" ;
     my $updateColumns           = "set\t";
     my $printStatement          = "" ;
@@ -231,6 +233,7 @@ sub generateScript {
         do { local $" = "";   $insertclause             .= "$l->[0]" ; $insertclause .= ", "} ;    
         do { local $" = "";   $valuesclause             .= "$l->[0]" ; $valuesclause .= ", "} ;    
         do { local $" = "";   $flatcolumnlist           .= "$l->[0]" ; $flatcolumnlist .= ", "} ;
+        do { local $" = "";   $flatExtractColumnList    .= $l->[1] =~ m{\A(?:date|datetime|smalldatetime)\z}i  ? "convert(varchar(30),$l->[0],120)" :  "$l->[0]" ; $flatExtractColumnList .= ", "} ;
         do { local $" = "";   $flatvariablelist         .= "@"."$l->[0]" ; $flatvariablelist .= ","} ;
 
         do { local $" = "";   $printStatement           .= "'  $$l[0]: ' " ; } ;
@@ -260,6 +263,7 @@ sub generateScript {
     $insertclause             =~ s{ ,\s? \z }{}msx;
     $valuesclause             =~ s{ ,\s? \z }{}msx;
     $flatcolumnlist           =~ s{ ,\s? \z }{}msx;
+    $flatExtractColumnList    =~ s{ ,\s? \z }{}msx;
     $flatvariablelist         =~ s{ ,\s? \z }{}msx;
     $updateColumns            =~ s{ \n\t\t\t\t\t,\t \z }{}msx;
     $printStatement           =~ s{ \+\s \z }{}msx;
@@ -274,9 +278,9 @@ sub generateScript {
 
 
 #    my $ra_data = getCurrentTableData($dbh,$combinedName,$pk_column,$flatcolumnlist);
-    my $ra_data = getCurrentTableData($dbh,$quotedCombinedName    ,$pk_column,$flatcolumnlist);
-
-
+#    my $ra_data = getCurrentTableData($dbh,$quotedCombinedName    ,$pk_column,$flatcolumnlist);
+    my $ra_data = getCurrentTableData($dbh,$quotedCombinedName    ,$pk_column,$flatExtractColumnList);
+    
     my @valuesTable     = undef;
     my $valuesClause    = "values\n\t\t\t";
 
@@ -288,20 +292,25 @@ sub generateScript {
 #exit;
         for ( my $i = 0; $i < scalar @{$ra_row}; $i++ ) {
 #warn Dumper $ra_row->[$i] ;    
-#warn Dumper $ColumnNumericity[$i] ;
+#warn Dumper $IsColumnNumeric[$i] ;
 #            $ra_row->[$i] = ( defined $ra_row->[$i] ) ? $ra_row->[$i] : "null" ;
             
-            if ( ( $ColumnNumericity[$i] == 1 ) and ( not ( defined ($ra_row->[$i]) ) ) ) {
+            if ( ( $IsColumnNumeric[$i] == 1 ) and ( not ( defined ($ra_row->[$i]) ) ) ) {
                 $outVals[$i] = 'null' ;  
             }
-            if ( ( $ColumnNumericity[$i] == 0 ) and ( not ( defined ($ra_row->[$i]) ) ) ) {
+            if ( ( $IsColumnNumeric[$i] == 0 ) and ( not ( defined ($ra_row->[$i]) ) ) ) {
                 $outVals[$i] = 'null' ;  
             }
-            if ( ( $ColumnNumericity[$i] == 1 ) and (     ( defined ($ra_row->[$i]) ) ) ) {
+            if ( ( $IsColumnNumeric[$i] == 1 ) and (     ( defined ($ra_row->[$i]) ) ) ) {
                 $outVals[$i] = $ra_row->[$i]  ;  
             }
-            if ( ( $ColumnNumericity[$i] == 0 ) and (     ( defined ($ra_row->[$i]) ) ) ) {
-                $outVals[$i] = $dbh->quote($ra_row->[$i])  ;  
+            if ( ( $IsColumnNumeric[$i] == 0 ) and (     ( defined ($ra_row->[$i]) ) ) ) {
+                if (${$ra_columns}[$i][1] =~ m{\A(?:date|datetime|smalldatetime)\z}i) {
+                    $outVals[$i] = "convert(". ${$ra_columns}[$i][1] ."," . $dbh->quote($ra_row->[$i]) . ",120)"   ;
+                }
+                else {
+                    $outVals[$i] = $dbh->quote($ra_row->[$i])  ;  
+                }
             }
         }
         #my @outVals = map { $ColumnNumericity{$_} == 1 ? $_ : $dbh->quote($_)  } @{$ra_row};

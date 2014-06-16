@@ -23,6 +23,7 @@ WriteMakefile(
         'DBI'                   => 0,
         'Data::Dumper'          => 0,
         'Getopt::Euclid'        => 0,
+        'Graph'                 => 0.90,
         'List::Util'            => 1.00,
         'POSIX'                 => 0,
         'autodie'               => 0,

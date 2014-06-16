@@ -45,6 +45,9 @@ Revision history for VSGDR::StaticData
 0.21    12/06/2014
         Fixed bug in multiple pk/un selection.  Fixed reporting of large-scale changes.
         Bugs identified in handling of multiple column primary key or unique constraints.
+0.22    16/06/2014
+        Added missing Graph dependency.
+        Improved datetime handling.
         
         
         
