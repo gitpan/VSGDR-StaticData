@@ -10,6 +10,8 @@ use POSIX qw(strftime);
 use Carp;
 use DBI;
 use Data::Dumper;
+use English;
+use Win32;
 
 ##TODO 1. Fix multi-column primary/unique keys.
 ##TODO 2. Check that non-key identity columns are handled correctly when they occur in the final position in the table.
@@ -20,11 +22,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.22
+Version 0.23
 
 =cut
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 
 sub databaseName {
@@ -115,7 +117,10 @@ sub generateScript {
     my $database                        = databaseName($dbh);
 
     no warnings;
-    my $userName                        = @{[getpwuid( $< )]}->[6]; $userName =~ s/,.*//;
+    no warnings;
+    my $userName                        = $OSNAME eq 'MSWin32' ? Win32::LoginName : @{[getpwuid( $< )]}->[6]; $userName =~ s/,.*//;
+    use warnings;
+    
     use warnings;                      
     my $date                            = strftime "%d/%m/%Y", localtime;
 

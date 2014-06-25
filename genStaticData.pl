@@ -10,6 +10,8 @@ no indirect ':fatal';
 use Carp;
 use DBI;
 
+our $opt_tablename;
+our $opt_connection;
 
 use Getopt::Euclid qw( :vars<opt_> );
 use Data::Dumper;

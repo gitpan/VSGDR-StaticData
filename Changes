@@ -48,6 +48,9 @@ Revision history for VSGDR::StaticData
 0.22    16/06/2014
         Added missing Graph dependency.
         Improved datetime handling.
+0.23    25/06/2014
+        Strawberry perl support added.
+
         
         
         
