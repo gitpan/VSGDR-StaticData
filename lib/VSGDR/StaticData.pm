@@ -22,11 +22,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.23
+Version 0.24
 
 =cut
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 
 sub databaseName {
@@ -230,9 +230,9 @@ sub generateScript {
 #warn Dumper     $padding;
        
 #        do { local $" = "\t"; $variabledeclaration      .= "@"."@{$l}[0,1,2,3,5]" ; $variabledeclaration .= "\n\t,\t\t"} ;
-        do { local $" = "\t"; $variabledeclaration      .= "@"."@{$l}[0]". "\t"x$varpadding . "$$l[1]" ."@{$l}[2,3,5]" ; $variabledeclaration .= "\n\t,\t\t"} ;
+        do { local $" = "\t"; $variabledeclaration      .= "@"."@{$l}[0]". "\t"x$varpadding . "$$l[1]" ."@{$l}[2,3]" ; $variabledeclaration .= "\n\t,\t\t"} ;
 #        do { local $" = "\t"; $tabledeclaration         .= "@{$l}" ; $tabledeclaration .= "\n\t\t,\t"} ;
-        do { local $" = "\t"; $tabledeclaration         .= "@{$l}[0]". "\t"x$colpadding . "$$l[1]" ."@{$l}[2,3,4,5]" ; ; $tabledeclaration .= "\n\t,\t\t"} ;
+        do { local $" = "\t"; $tabledeclaration         .= "@{$l}[0]". "\t"x$colpadding . "$$l[1]" ."@{$l}[2,3,4,5]" ; $tabledeclaration .= "\n\t,\t\t"} ;
 #        do { local $" = "";   $selectstatement          .= "@"."$l->[0]\t\t= $l->[0]" ; $selectstatement .= "\n\t\t,\t\t"} ;
         do { local $" = "";   $selectstatement          .= "@"."$l->[0]" . "\t"x$varpadding ."= $l->[0]" ; $selectstatement .= "\n\t\t,\t\t"} ;
         do { local $" = "";   $insertclause             .= "$l->[0]" ; $insertclause .= ", "} ;    
@@ -719,10 +719,10 @@ select  Column_name
         as datasize
 ,       case when lower(Data_type) not like '%int%' and Numeric_precision is not null then '('+cast(Numeric_precision as varchar(10))+','+cast(Numeric_scale as varchar(10))+')' else '' end 
         as dataprecision
+,       case when DATABASEPROPERTYEX(db_name(), 'Collation') != collation_name then 'collate ' + collation_name else '' end 
+        as collation
 ,       case when LOWER(IS_NULLABLE) = 'no' then 'not null' else 'null' end
         as datanullabity
-,       case when DATABASEPROPERTYEX(db_name(), 'Collation') != collation_name then collation_name else '' end 
-        as collation
 from    INFORMATION_SCHEMA.COLUMNS
 where   1=1
 and     TABLE_SCHEMA        = ?
