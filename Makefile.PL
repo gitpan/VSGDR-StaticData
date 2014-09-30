@@ -15,6 +15,7 @@ WriteMakefile(
     PL_FILES            => {},
     EXE_FILES => [ "genStaticData.pl", 
                    "tableDependencies.pl",     
+                   "allTableDependencies.pl",     
                  ],
     PREREQ_PM => {
         'Test::More'            => 0,

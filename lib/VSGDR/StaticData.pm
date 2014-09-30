@@ -22,11 +22,11 @@ VSGDR::StaticData - Static data script support package for SSDT post-deployment 
 
 =head1 VERSION
 
-Version 0.24
+Version 0.25
 
 =cut
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 
 sub databaseName {
@@ -79,6 +79,7 @@ select  distinct
 ,       tc1.TABLE_CATALOG               as from_CATALOG
 ,       tc1.TABLE_SCHEMA                as from_SCHEMA
 ,       tc1.TABLE_NAME                  as from_NAME
+,       rc.CONSTRAINT_NAME              as to_CONSTRAINT
 from    INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
 join    INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc1
 on      tc1.CONSTRAINT_SCHEMA           = rc.CONSTRAINT_SCHEMA

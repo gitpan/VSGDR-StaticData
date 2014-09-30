@@ -52,6 +52,8 @@ Revision history for VSGDR::StaticData
         Strawberry perl support added.
 0.24    08/08/2014
         Fixed output of collate properties against columns.
+0.25    30/09/2014
+        Added allTableDependencies.pl
         
 
         
